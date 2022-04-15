@@ -1,11 +1,9 @@
 import "./styles.css";
 
 // TODO:
-// * Add text component
-//  * Need to be able to edit these again after adding
-//  * Add font-size changing with number keys like arrows
 // * Consider making the markers classes so you don't have conditional
 //   logic strewn everywhere...
+// * Need to be able to edit text again after it's added
 // * Add bigger invisible markers for selecting
 // * Add handles for box?
 //   * Normally there are a bunch of these, you can resize from every corner
@@ -131,9 +129,10 @@ class Text {
 
 class Arrow {
   constructor(svg, x, y) {
+    const endX = x + 1;
+    const endY = y + 1;
+
     this.svg = svg;
-    let endX = x + 1;
-    let endY = y + 1;
     this.line = document.createElementNS(XMLNS, "line");
     this.line.setAttribute("x1", x);
     this.line.setAttribute("y1", y);
@@ -315,29 +314,66 @@ class Arrow {
 
 class Box {
   constructor(svg, x, y) {
+    this.svg = svg;
     this.rect = document.createElementNS(XMLNS, "rect");
     this.rect.setAttribute("x", x);
     this.rect.setAttribute("y", y);
     this.rect.setAttribute("width", 1);
     this.rect.setAttribute("height", 1);
+    this.rect.setAttribute("stroke", currentColor);
     this.rect.setAttribute("stroke-width", "3");
     this.rect.setAttribute("fill", "none");
-    //   let w = currentX - startX;
-    //   let newX = startX;
-    //   if (w < 0) {
-    //     w *= -1;
-    //     newX = currentX;
-    //   }
-    //   let h = currentY - startY;
-    //   let newY = startY;
-    //   if (h < 0) {
-    //     h *= -1;
-    //     newY = currentY;
-    //   }
-    //   marker.setAttribute("x", newX);
-    //   marker.setAttribute("y", newY);
-    //   marker.setAttribute("width", w);
-    //   marker.setAttribute("height", h);
+    this.rect.classList.add("marker");
+
+    this.moveListener = (e) => {
+      const currentX = e.clientX - svgBoundingRect.left;
+      const currentY = e.clientY - svgBoundingRect.top;
+      let w = currentX - x;
+      let newX = x;
+      if (w < 0) {
+        w *= -1;
+        newX = currentX;
+      }
+      let h = currentY - y;
+      let newY = y;
+      if (h < 0) {
+        h *= -1;
+        newY = currentY;
+      }
+      this.rect.setAttribute("x", newX);
+      this.rect.setAttribute("y", newY);
+      this.rect.setAttribute("width", w);
+      this.rect.setAttribute("height", h);
+    }
+
+    this.svg.appendChild(this.rect);
+
+    this.rect.__instance = this;
+
+    document.addEventListener("mousemove", this.moveListener);
+    document.addEventListener("mouseup", () => {
+      if (this.moveListener) {
+        document.removeEventListener("mousemove", this.moveListener);
+        selectMarker(this);
+        mode = "select";
+        this.moveListener = null;
+      }
+    });
+  }
+
+  handleSelect() {
+    this.rect.setAttribute("stroke", "blue");
+  }
+
+  handleDeselect(){
+    this.rect.setAttribute("stroke", currentColor);
+  }
+
+  handleKeys(e) {
+    if (e.key === "x") {
+      clearSelection();
+      this.rect.parentElement.removeChild(this.rect);
+    }
   }
 }
 
@@ -349,7 +385,7 @@ function initAnnotater(image) {
   svg.setAttribute("height", image.clientHeight);
   svg.classList.add("annotater");
   image.parentElement.appendChild(svg);
-  // TODO: You might later need to take care to update this...
+  // TODO: Later you might need to take care to update this if the svg/window changes size etc...
   svgBoundingRect = svg.getBoundingClientRect();
 
   const clear = document.getElementById("clear");
@@ -396,12 +432,14 @@ function initAnnotater(image) {
 
     if (e.target.classList.contains("marker")) {
       selectMarker(e.target.__instance);
+      return;
     }
 
     const x = e.clientX - svgBoundingRect.left;
     const y = e.clientY - svgBoundingRect.top;
 
     if (mode === "box") {
+      console.log('adding box')
       new Box(svg, x, y);
     } else if (mode === "arrow") {
       new Arrow(svg, x, y);
@@ -446,7 +484,6 @@ function initAnnotater(image) {
 
 const sourceContainer = document.getElementById("source-container");
 const img = sourceContainer.querySelector("img");
-// img.crossOrigin = "anonymous";
 // For some reason this didn't always fire...
 //img.addEventListener("load", function () {
 //initAnnotater(this);
